@@ -2,7 +2,7 @@
 # install.packages("cmdstanr", repos="https://mc-stan.org/r-packages/")
 # install.packages("languageserver")
 
-setwd("C:/Users/sebas/one/OneDrive/grive/faks/masters/y2/s1/BayesianStats/hw1")
+setwd("C:/Users/sebas/one/OneDrive/grive/faks/masters/y2/s1/BayesianStats/BayesianStats/hw1")
 
 library(cmdstanr) # for interfacing Stan
 library(ggplot2) # for visualizations
@@ -116,10 +116,6 @@ sprintf("Population effect: %.2f (95%% CI: %.2f, %.2f)", mean_population, ci_pop
 
 ############################ 3. When am I going to die #############
 
-softmax <- function(x) {
-  as.vector(exp(x) / sum(exp(x)))
-}
-
 colnames(X)
 slo_gdp <- 58150  # PPP
 slo_gdp_scaled <- (slo_gdp - min_gdp) / (max_gdp - min_gdp)
@@ -144,6 +140,85 @@ y_pred <- my_info %*% t(beta_mat)
 y_mean <- mean(y_pred)
 y_ci <- quantile(y_pred, c(0.025, 0.975))
 sprintf("I will live till %.2f; CI: [%.2f, %.2f]", y_mean, y_ci[1], y_ci[2])
+
+############################ 4. Average european born in 2001 vs other 2001 ppl #############
+
+# eu_gdp <- mean(data$gdp_per_capita[data$continent == "Europe"])
+# eu_pop <- mean(data$population[data$continent == "Europe"])
+
+# africa_gdp <- mean(data$gdp_per_capita[data$continent == "Africa"])
+# africa_pop <- mean(data$population[data$continent == "Africa"])
+
+colnames(X)
+colnames(beta_mat)
+contrasts(data$continent)
+
+continent_means <- data |> group_by(continent) |> summarize(
+  mean_gdp = mean(gdp_per_capita),
+  mean_pop = mean(population),
+  .groups = "drop"
+)
+continent_means
+
+continents <- c("Africa", "Americas", "Asia", "Europe", "Oceania")
+
+make_input_vec_mean <- function(continent, year, means, contrast_mtx) {
+  gdp <- means$mean_gdp[means$continent == continent]
+  pop <- means$mean_pop[means$continent == continent]
+
+  onehot <- contrast_mtx[continent, ]
+
+  c(1, gdp, pop, onehot, year)
+}
+contr <- contrasts(data$continent)
+year_scaled <- (2001 - min_year) / (max_year - min_year)
+year_scaled
+
+inputs <- lapply(continents, function(continent) {
+  make_input_vec_mean(continent, year_scaled, continent_means, contr)
+})
+
+mat <- matrix(NA, nrow = nrow(beta_mat), ncol = length(inputs))
+for (j in seq(inputs)) {
+  mat[, j] <- inputs[[j]] %*% t(beta_mat)
+}
+
+colnames(mat) <- continents
+eu_le <- mat[ , 4]
+
+eu_vs_africa <- eu_le > mat[, 1]
+eu_vs_americas <- eu_le > mat[, 2]
+eu_vs_asia <- eu_le > mat[, 3]
+eu_vs_oceania <- eu_le > mat[, 5]
+
+colMeans(mat)
+
+# Check probabilities
+mean(eu_vs_africa)
+quantile(eu_vs_africa, c(0.025, 0.975))
+
+mean(eu_vs_americas)
+quantile(eu_vs_americas, c(0.025, 0.975))
+
+mean(eu_vs_asia)
+quantile(eu_vs_asia, c(0.025, 0.975))
+
+mean(eu_vs_oceania)
+quantile(eu_vs_oceania, c(0.025, 0.975))
+
+df_long <- as.data.frame(mat) %>%
+  pivot_longer(cols = everything(), names_to = "continent", values_to = "life_expectancy")
+
+# Plot distributions
+windows()
+ggplot(df_long, aes(x = life_expectancy, fill = continent)) +
+  geom_density(alpha = 0.4) +
+  xlim(50, 90) +
+  xlab("Predicted life expectancy") +
+  ylab("Density") +
+  ggtitle("Posterior distribution of life expectancy by continent") +
+  theme_minimal()
+
 
 ######################################################
 
