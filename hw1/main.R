@@ -186,6 +186,17 @@ for (j in seq(inputs)) {
 colnames(mat) <- continents
 eu_le <- mat[ , 4]
 
+mean_eu <- mean(eu_le)
+mean_eu_africa <- mean_eu > mean(mat[,1])
+mean_eu_americas <- mean_eu > mean(mat[,2])
+mean_eu_asia <- mean_eu > mean(mat[,3])
+mean_eu_oceania <- mean_eu > mean(mat[,5])
+
+res <- c(as.integer(mean_eu_africa), as.integer(mean_eu_americas), as.integer(mean_eu_asia), as.integer(mean_eu_oceania))
+res
+# Average european will outlive average african, american, asian but not oceanian
+
+############################ 5. Any european born in 2001 vs other 2001 ppl #############
 eu_vs_africa <- eu_le > mat[, 1]
 eu_vs_americas <- eu_le > mat[, 2]
 eu_vs_asia <- eu_le > mat[, 3]
@@ -218,6 +229,30 @@ ggplot(df_long, aes(x = life_expectancy, fill = continent)) +
   ylab("Density") +
   ggtitle("Posterior distribution of life expectancy by continent") +
   theme_minimal()
+
+# Europeans will still outlive everyone except oceaninans
+diff_eu_africa    <- eu_le - mat[, 1]
+diff_eu_americas  <- eu_le - mat[, 2]
+diff_eu_asia      <- eu_le - mat[, 3]
+diff_eu_oceania   <- eu_le - mat[, 5]
+
+# Combine all differences into one vector for plotting
+diff_eu_all <- c(diff_eu_africa, diff_eu_americas, diff_eu_asia, diff_eu_oceania)
+
+prob <- mean(diff_eu_all > 0)   
+ci <- quantile(diff_eu_all, c(0.025, 0.975))
+sprintf("P(Europe > other continents) = %.2f%%", prob*100)
+
+df <- data.frame(diff = diff_eu_all)
+
+windows()
+ggplot(df, aes(x = diff)) +
+  geom_density(fill = "skyblue", alpha = 0.5) +
+  geom_vline(xintercept = ci, color = "darkblue", linewidth=1) +  # CI lines
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
+  xlab("Life expectancy difference (Europe - other continents)") +
+  ylab("Density") +
+  ggtitle("Posterior distribution of Europe vs other continents")
 
 
 ######################################################
