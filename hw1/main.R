@@ -65,13 +65,19 @@ fit <- model$sample(
 # MCMC analysis
 mcmc_trace(fit$draws("betas"))
 fit$summary("betas")
+mcse_mean(df_betas$population)
 
 # Transform Betas
+sigmas <- as_draws_df(fit$draws("sigma"))
 df_betas <- as_draws_df(fit$draws("betas"))
 df_betas <- df_betas %>% select(-.chain, -.iteration, -.draw)
 colnames(df_betas) <- colnames(X)
 
-mcse_mean(df_betas$population)
+
+df_all <- df_betas
+df_all$sigma <- sigmas$sigma
+colnames(df_all) <- c(colnames(X), "sigma")#c("(Intercept)", "gdp_per_capita", "population", "continent2", "continent3", "continent4", "continent5", "year", "sigma")
+
 
 beta_mat <- as.matrix(df_betas)  # rows = iterations, cols = betas
 colnames(beta_mat) <- colnames(X)
@@ -194,17 +200,12 @@ for (j in seq(inputs)) {
 colnames(mat) <- continents
 eu_le <- mat[ , 4]
 
-mean_eu <- mean(eu_le)
-mean_eu_africa <- mean_eu > mean(mat[,1])
-mean_eu_americas <- mean_eu > mean(mat[,2])
-mean_eu_asia <- mean_eu > mean(mat[,3])
-mean_eu_oceania <- mean_eu > mean(mat[,5])
+# mean_eu <- mean(eu_le)
+# mean_eu_africa <- mean_eu > mean(mat[,1])
+# mean_eu_americas <- mean_eu > mean(mat[,2])
+# mean_eu_asia <- mean_eu > mean(mat[,3])
+# mean_eu_oceania <- mean_eu > mean(mat[,5])
 
-res <- c(as.integer(mean_eu_africa), as.integer(mean_eu_americas), as.integer(mean_eu_asia), as.integer(mean_eu_oceania))
-res
-# Average european will outlive average african, american, asian but not oceanian
-
-############################ 5. Any european born in 2001 vs other 2001 ppl #############
 eu_vs_africa <- eu_le > mat[, 1]
 eu_vs_americas <- eu_le > mat[, 2]
 eu_vs_asia <- eu_le > mat[, 3]
@@ -228,6 +229,10 @@ quantile(eu_vs_oceania, c(0.025, 0.975))
 df_long <- as.data.frame(mat) %>%
   pivot_longer(cols = everything(), names_to = "continent", values_to = "life_expectancy")
 
+
+res <- c(as.integer(mean_eu_africa), as.integer(mean_eu_americas), as.integer(mean_eu_asia), as.integer(mean_eu_oceania))
+res
+
 # Plot distributions
 windows()
 ggplot(df_long, aes(x = life_expectancy, fill = continent)) +
@@ -238,29 +243,54 @@ ggplot(df_long, aes(x = life_expectancy, fill = continent)) +
   ggtitle("Posterior distribution of life expectancy by continent") +
   theme_minimal()
 
-# Europeans will still outlive everyone except oceaninans
-diff_eu_africa    <- eu_le - mat[, 1]
-diff_eu_americas  <- eu_le - mat[, 2]
-diff_eu_asia      <- eu_le - mat[, 3]
-diff_eu_oceania   <- eu_le - mat[, 5]
 
-# Combine all differences into one vector for plotting
-diff_eu_all <- c(diff_eu_africa, diff_eu_americas, diff_eu_asia, diff_eu_oceania)
+# individual vs avg
+# avg: take means
+# ind: B, sigma -> Sample normals around linear predictors. output = (B[1:8] + sigma) ~ N(XB, sigma) -> sample and compute
 
-prob <- mean(diff_eu_all > 0)   
-ci <- quantile(diff_eu_all, c(0.025, 0.975))
-sprintf("P(Europe > other continents) = %.2f%%", prob*100)
+# Average european will outlive average african, american, asian but not oceanian
 
-df <- data.frame(diff = diff_eu_all)
+############################ 5. Any european born in 2001 vs other 2001 ppl #############
+betasigma_mat = as.matrix(df_all)
+colnames(betasigma_mat) <- colnames(df_all)
+
+mat <- matrix(NA, nrow = nrow(betasigma_mat), ncol = length(inputs) + 1)
+mat[, 1] <- betasigma_mat[, ncol(betasigma_mat)]
+for (j in seq(inputs)) {
+  mat[, j+1] <- inputs[[j]] %*% t(beta_mat) # MEAN
+}
+dim(mat)
+colnames(mat) <- c("sigma", continents)
+colnames(mat)
+
+# sigma + Mean for each continent
+n_samples = nrow(mat)
+pred_samples_africa <- rnorm(n=n_samples, mean = mat[, 2], sd = mat[, 1])
+pred_samples_americas <- rnorm(n=n_samples, mean = mat[, 3], sd = mat[, 1])
+pred_samples_asia <- rnorm(n=n_samples, mean = mat[, 4], sd = mat[, 1])
+pred_samples_eu <- rnorm(n=n_samples, mean = mat[, 5], sd = mat[, 1])
+pred_samples_oceania <- rnorm(n=n_samples, mean = mat[, 6], sd = mat[, 1])
+
+predictive_df <- data.frame(
+  africa = pred_samples_africa,
+  americas = pred_samples_americas,
+  asia = pred_samples_asia,
+  eu = pred_samples_eu,
+  oceania = pred_samples_oceania
+)
+
+# long
+pred_long <- predictive_df %>%
+  pivot_longer(cols = everything(), names_to = "continent", values_to = "life_expectancy")
 
 windows()
-ggplot(df, aes(x = diff)) +
-  geom_density(fill = "skyblue", alpha = 0.5) +
-  geom_vline(xintercept = ci, color = "darkblue", linewidth=1) +  # CI lines
-  geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
-  xlab("Life expectancy difference (Europe - other continents)") +
+ggplot(pred_long, aes(x = life_expectancy, fill = continent)) +
+  geom_density(alpha = 0.4) +
+  # xlim(50, 90) +
+  xlab("Predicted life expectancy") +
   ylab("Density") +
-  ggtitle("Posterior distribution of Europe vs other continents")
+  ggtitle("Posterior distribution of life expectancy by continent") +
+  theme_minimal()
 
 
 ############### Me vs. Professor #####################
