@@ -71,6 +71,8 @@ df_betas <- as_draws_df(fit$draws("betas"))
 df_betas <- df_betas %>% select(-.chain, -.iteration, -.draw)
 colnames(df_betas) <- colnames(X)
 
+mcse_mean(df_betas$population)
+
 beta_mat <- as.matrix(df_betas)  # rows = iterations, cols = betas
 colnames(beta_mat) <- colnames(X)
 
@@ -81,8 +83,8 @@ betas
 
 # Convert to two columns for plotting
 df_betas["(Intercept)"] <- NULL
-df_betas_long <- df_betas %>% select(-year_rescaled, -population_rescaled, -gdp_per_capita_rescaled) %>%
-  pivot_longer(everything(), names_to = "feature", values_to = "value")
+#%>% select(-year_rescaled, -population_rescaled, -gdp_per_capita_rescaled) %>%
+df_betas_long <- df_betas %>% pivot_longer(everything(), names_to = "feature", values_to = "value")
 
 windows()
 ggplot(df_betas_long, aes(x = value, y = feature)) +
@@ -97,7 +99,8 @@ year_mean = mean(df_betas$year_rescaled)
 year_sd = sd(df_betas$year_rescaled)
 sprintf("Each year, life expectancy goes up by %.2f pm %.2f years", year_mean, year_sd)
 
-############################ 2. GDP and population correlation to life exp #############.
+
+####################### 2. GDP and population correlation to life exp #############.
 
 df_betas$gdp_per_capita_rescaled <- rescale(df_betas$gdp_per_capita, min_gdp, max_gdp)
 df_betas$population_rescaled <- rescale(df_betas$population, min_population, max_population)
@@ -114,6 +117,11 @@ ci_population <- quantile(beta_population, c(0.025, 0.975))
 sprintf("GDP per capita effect: %.2f (95%% CI: %.2f, %.2f)", mean_gdp, ci_gdp[1], ci_gdp[2])
 sprintf("Population effect: %.2f (95%% CI: %.2f, %.2f)", mean_population, ci_population[1], ci_population[2])
 
+scaled_mean_gdp <- rescale(mean_gdp, min_gdp, max_gdp)
+scaled_mean_gdp
+
+scaled_mean_pop <- rescale(mean_population, min_population, max_population)
+scaled_mean_pop
 ############################ 3. When am I going to die #############
 
 colnames(X)
@@ -135,10 +143,10 @@ my_info <- c(
   year_scaled
   )
 
-y_pred <- my_info %*% t(beta_mat)
+my_pred <- my_info %*% t(beta_mat)
 
-y_mean <- mean(y_pred)
-y_ci <- quantile(y_pred, c(0.025, 0.975))
+y_mean <- mean(my_pred)
+y_ci <- quantile(my_pred, c(0.025, 0.975))
 sprintf("I will live till %.2f; CI: [%.2f, %.2f]", y_mean, y_ci[1], y_ci[2])
 
 ############################ 4. Average european born in 2001 vs other 2001 ppl #############
@@ -255,8 +263,40 @@ ggplot(df, aes(x = diff)) +
   ggtitle("Posterior distribution of Europe vs other continents")
 
 
-######################################################
+############### Me vs. Professor #####################
+prof_data <- my_info
+colnames(X)
+prof_data[8] <- (1985 - min_year) / (max_year - min_year)
+prof_data
 
+prof_pred <- prof_data %*% t(beta_mat)
+prof_pred[,1]
+my_pred[]
+diff <- my_pred - prof_pred
+mean(diff > 0)
+
+
+mean(comp)
+quantile(comp, c(0.025, 0.975))
+sd(my_pred)
+sd(prof_pred)
+mcse_mean(my_pred)
+
+df <- data.frame(my_pred = as.vector(my_pred), prof_pred = as.vector(prof_pred), diff = as.vector(diff))
+df_long <- pivot_longer(
+  df,
+  cols = c(my_pred, prof_pred), # Columns to gather
+  names_to = "Predictor",        # New column for the group name (my_pred/prof_pred)
+  values_to = "life_exp" # New column for the predicted values
+)
+
+windows()
+ggplot(df_long, aes(x=life_exp, fill=Predictor)) + geom_density(alpha=.5) + 
+  geom_vline(aes(xintercept = mean(my_pred)), color="red") + 
+  geom_vline(aes(xintercept = mean(prof_pred)), color="blue")
+
+
+######################################################
 ggplot(data, aes(x = gdp_per_capita, y = y)) +
   geom_point() +
   geom_smooth(method = "lm", se = TRUE, color = "blue") +
