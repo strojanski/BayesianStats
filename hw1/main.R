@@ -217,12 +217,19 @@ ggplot(my_dist, aes(x = my_dist)) +
 colnames(X)
 colnames(beta_mat)
 contrasts(data$continent)
+colnames(data)
 
-continent_means <- data |> group_by(continent) |> summarize(
-  mean_gdp = mean(gdp_per_capita),
-  mean_pop = mean(population),
-  .groups = "drop"
-)
+year_l = (1999 - min_year) / (max_year - min_year)
+year_u = (2003 - min_year) / (max_year - min_year)
+
+continent_means <- data %>%
+  filter(year >= year_l & year <= year_u) %>% 
+  group_by(continent) %>%  
+  summarize(
+    mean_gdp = mean(gdp_per_capita),
+    mean_pop = mean(population),
+    .groups = "drop"
+  )
 continent_means
 
 continents <- c("Africa", "Americas", "Asia", "Europe", "Oceania")
@@ -248,8 +255,8 @@ mat <- matrix(NA, nrow = nrow(beta_mat), ncol = length(inputs))
 for (j in seq(inputs)) {
   mat[, j] <- inputs[[j]] %*% t(beta_mat)
 }
-
 colnames(mat) <- continents
+mat[1:10, ]
 
 # mean_eu <- mean(eu_le)
 # mean_eu_africa <- mean_eu > mean(mat[,1])
@@ -262,8 +269,6 @@ eu_vs_africa <- eu_le - mat[, 1]
 eu_vs_americas <- eu_le - mat[, 2]
 eu_vs_asia <- eu_le - mat[, 3]
 eu_vs_oceania <- eu_le - mat[, 5]
-
-colMeans(mat)
 
 # Check how much longer eu lives in years
 mcse(eu_vs_africa)
@@ -330,8 +335,8 @@ for (j in seq(inputs)) {
 dim(mat)
 colnames(mat) <- c("sigma", continents)
 colnames(mat)
+sigmas$sigma
 
-colnames(betasigma_mat)
 # sigma + Mean for each continent
 n_samples = nrow(mat)
 pred_samples_africa <- rnorm(n=n_samples, mean = mat[, 2], sd = mat[, 1])
@@ -358,8 +363,9 @@ ggplot(pred_long, aes(x = life_expectancy, fill = continent)) +
   # xlim(50, 90) +
   xlab("Predicted life expectancy") +
   ylab("Density") +
-  ggtitle("Posterior distribution of life expectancy by continent") +
-  theme_minimal()
+  # ggtitle("Posterior distribution of life expectancy by continent") +
+  theme(axis.text = element_text(size=14), legend.text = element_text(size=14))
+
 
 # Individual life exp
 mcse(pred_samples_eu - pred_samples_africa)
@@ -443,7 +449,8 @@ df_long <- pivot_longer(
 windows()
 ggplot(df_long, aes(x=life_exp, fill=Predictor)) + geom_density(alpha=.5) + 
   geom_vline(aes(xintercept = mean(my_pred)), color="red") + 
-  geom_vline(aes(xintercept = mean(prof_pred)), color="blue")
+  geom_vline(aes(xintercept = mean(prof_pred)), color="blue") +
+  theme(axis.text = element_text(size=14), legend.text = element_text(size=14))
 
 ######################################################
 
