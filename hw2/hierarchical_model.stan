@@ -31,11 +31,9 @@ parameters {
 }
 
 model {
-  // Priors (weakly informative)
   alpha_global ~ normal(5, 2);
   beta_global ~ normal(0, 1);
 
-  // exponential defined on positive reals
   sigma_y ~ exponential(1);
   sigma_alpha_cont ~ exponential(1);
   sigma_alpha_country ~ exponential(1);
@@ -62,3 +60,4 @@ model {
     );
   }
 }
+
