@@ -21,7 +21,7 @@ parameters {
 
 model {
 
-  alpha ~ normal(0, 10);
+  alpha ~ normal(90, 10);
   beta ~ normal(0, 1);
 
   real ssn;

@@ -14,7 +14,7 @@ df$no2 <- df$no2 - mean(df$no2, na.rm = TRUE) / sd(df$no2, na.rm = TRUE)
 
 colnames <- c("date", "no2")
 
-
+acf(df$no2, na.action = na.pass, main = "ACF of NO2 levels")
 # Signal
 x <- df$no2
 x <- x - mean(x, na.rm = TRUE)   # detrend
